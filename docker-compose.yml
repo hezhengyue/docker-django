@@ -1,0 +1,131 @@
+# docker-compose.yml - 修复 YAML 语法错误
+
+services:
+  # 🖥️ Web 服务
+  web:
+    build: ./django
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./django:/app
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
+      - logs_volume:/app/logs
+    env_file:
+      - .env
+    environment:
+      - LOG_DIR=/app/logs
+      - STATIC_ROOT=/app/staticfiles
+      - MEDIA_ROOT=/app/media
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - django-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ⚙️ Celery Worker
+  celery-worker:
+    build: ./django
+    command: celery -A config worker -l info -c 2
+    volumes:
+      - logs_volume:/app/logs
+    env_file:
+      - .env
+    environment:
+      - LOG_DIR=/app/logs
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - django-net
+    restart: unless-stopped
+
+  # 💾 Redis
+  redis:
+    image: redis:7.2.13-alpine3.21
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_volume:/data
+    networks:
+      - django-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 🗄️ PostgreSQL
+  db:
+    image: postgres:15.17-alpine3.23
+    ports:
+      - "5432:5432"
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_DB=${POSTGRES_DB:-db}
+      - POSTGRES_PORT=${POSTGRES_PORT:-5432}
+    volumes:
+      - postgres_volume:/var/lib/postgresql/data
+    networks:
+      - django-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -p ${POSTGRES_PORT:-5432}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 🌐 Nginx
+  nginx:
+    image: nginx:1.26.3-alpine3.20
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      web:
+        condition: service_healthy
+    networks:
+      - django-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "-k", "https://localhost/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# 💽 数据卷（✅ 每个独占一行）
+volumes:
+  static_volume:
+  media_volume:
+  logs_volume:
+  redis_volume:
+  postgres_volume:
+  nginx_logs:
+
+# 🌍 网络
+networks:
+  django-net:
+    driver: bridge
