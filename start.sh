@@ -52,8 +52,8 @@ case "${1:-help}" in
     up|start)
         ensure_env
         ensure_cert
-        echo -e "${BLUE}🚀 启动服务...${NC}"
-        $COMPOSE up -d
+        echo -e "${BLUE}🚀 启动全量服务 (含 web/celery/nginx)...${NC}"
+        $COMPOSE --profile full up -d  # 👈 关键：加 --profile full 启动带标签的服务
         sleep 3
         echo -e "\n${GREEN}✅ 服务已启动！${NC}"
         echo -e "  🔐 ${GREEN}https://localhost${NC}"
@@ -61,18 +61,20 @@ case "${1:-help}" in
         echo -e "  💡 首次请运行: ${YELLOW}./start.sh init${NC}"
         ;;
     down|stop)
-        echo -e "${BLUE}🛑 停止服务...${NC}"
-        $COMPOSE down
+        echo -e "${BLUE}🛑 停止所有服务...${NC}"
+        $COMPOSE --profile full down --remove-orphans  # 👈 加 --profile full + 清理孤儿
         ;;
+    
     rebuild)
         echo -e "${BLUE}🔄 重建镜像并启动...${NC}"
-        $COMPOSE down
-        $COMPOSE up -d --build
+        $COMPOSE --profile full down --remove-orphans
+        $COMPOSE --profile full up -d --build
         ;;
+    
     restart)
-        echo -e "${BLUE}🔄 重启服务...${NC}"
-        $COMPOSE down
-        $COMPOSE up -d
+        echo -e "${BLUE}🔄 重启所有服务...${NC}"
+        $COMPOSE --profile full down --remove-orphans
+        $COMPOSE --profile full up -d
         ;;
     logs)
         SERVICE="${2:-web}"
@@ -97,7 +99,7 @@ case "${1:-help}" in
         
         # 1. 确保服务已启动
         echo -e "${YELLOW}📦 步骤 1/3: 检查服务状态...${NC}"
-        if ! $COMPOSE ps | grep -q "web.*Up"; then
+        if ! $COMPOSE --profile full ps | grep -q "web.*Up"; then
             echo -e "${YELLOW}⚠️  服务未运行，正在启动...${NC}"
             ./start.sh up
             sleep 5
@@ -159,8 +161,31 @@ case "${1:-help}" in
         ensure_cert
         ;;
     ps)
-        $COMPOSE ps
+        $COMPOSE --profile full ps  # 👈 加 --profile full 才能看到所有服务
         ;;
+    
+    # ===== 🧑‍💻 开发模式（本地Python + Docker基础设施） =====
+    dev:up)
+        echo -e "${BLUE}🔧 开发模式：启动基础设施 (db + redis)...${NC}"
+        ensure_env
+        $COMPOSE up -d db redis  # 👈 不加 --profile，自动跳过带 ["full"] 标签的服务
+        echo -e "${GREEN}✅ 已启动: PostgreSQL(5432) + Redis(6379)${NC}"
+        echo -e "${YELLOW}💡 现在可本地运行: cd django && python manage.py runserver 0.0.0.0:8000${NC}"
+        ;;
+    
+    dev:down)
+        echo -e "${BLUE}🛑 停止开发基础设施...${NC}"
+        # 👇 注意：docker compose down 不支持指定服务名，改用 stop + rm
+        $COMPOSE stop db redis
+        $COMPOSE rm -f db redis
+        echo -e "${GREEN}✅ db + redis 已停止${NC}"
+        ;;
+    
+    dev:restart)
+        echo -e "${BLUE}🔄 重启开发基础设施...${NC}"
+        $COMPOSE restart db redis
+        ;;
+    
     help|--help|-h|*)
         echo -e "${BLUE}================================${NC}"
         echo -e "${BLUE}  Django + Docker 开发 CLI 🔧${NC}"
@@ -168,22 +193,28 @@ case "${1:-help}" in
         echo
         echo -e "用法: ${GREEN}./start.sh <command>${NC}"
         echo
-        echo -e "  ${YELLOW}up / start${NC}       启动所有服务（自动检查 .env 和证书）"
-        echo -e "  ${YELLOW}down / stop${NC}      停止服务"
-        echo -e "  ${YELLOW}rebuild${NC}          重建镜像并启动"
-        echo -e "  ${YELLOW}restart${NC}          重启服务"
+        echo -e "  ${YELLOW}up / start${NC}       启动全量服务 (web+celery+nginx+db+redis)"
+        echo -e "  ${YELLOW}down / stop${NC}      停止所有服务"
+        echo -e "  ${YELLOW}rebuild${NC}          重建镜像并启动全量服务"
+        echo -e "  ${YELLOW}restart${NC}          重启所有服务"
         echo -e "  ${YELLOW}init / setup${NC}     ✨ 初始化新环境(迁移+静态文件+管理员)"
         echo -e "  ${YELLOW}logs [service]${NC}   查看日志（默认 web，如 nginx/redis）"
-        echo -e "  ${YELLOW}shell${NC}            进入 Django Shell"
+        echo -e "  ${YELLOW}shell${NC}            进入 Django Shell (容器内)"
         echo -e "  ${YELLOW}bash${NC}             进入 Web 容器终端"
-        echo -e "  ${YELLOW}migrate${NC}          执行数据库迁移"
-        echo -e "  ${YELLOW}makemigrations${NC}   生成迁移文件"
-        echo -e "  ${YELLOW}collectstatic${NC}    收集静态文件(解决样式丢失)"
-        echo -e "  ${YELLOW}superuser${NC}        创建管理员账号"
+        echo -e "  ${YELLOW}migrate${NC}          执行数据库迁移 (容器内)"
+        echo -e "  ${YELLOW}makemigrations${NC}   生成迁移文件 (容器内)"
+        echo -e "  ${YELLOW}collectstatic${NC}    收集静态文件 (容器内)"
+        echo -e "  ${YELLOW}superuser${NC}        创建管理员账号 (容器内)"
         echo -e "  ${YELLOW}clean${NC}            清理容器+数据卷（二次确认）"
-        echo -e "  ${YELLOW}ps${NC}               查看运行状态"
+        echo -e "  ${YELLOW}ps${NC}               查看运行状态 (全量服务)"
+        echo -e "  ${YELLOW}dev:up${NC}         🧑‍💻 开发模式: 只启动 db+redis (本地跑 Django)"
+        echo -e "  ${YELLOW}dev:down${NC}       停止开发基础设施"
+        echo -e "  ${YELLOW}dev:restart${NC}    重启开发基础设施"
         echo -e "  ${YELLOW}help${NC}             显示此帮助"
         echo
-        echo -e "${YELLOW}💡 提示: 所有命令均自动处理环境依赖，无需手动干预${NC}"
+        echo -e "${YELLOW}💡 提示:${NC}"
+        echo -e "   • 开发模式: ${GREEN}./start.sh dev:up${NC} → 本地 ${GREEN}python manage.py runserver${NC}"
+        echo -e "   • 全量模式: ${GREEN}./start.sh up${NC} → 容器内完整环境"
+        echo -e "   • 确保 .env 中 ${GREEN}POSTGRES_HOST=localhost${NC} 以便本地连接"
         ;;
 esac
