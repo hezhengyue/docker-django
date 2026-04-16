@@ -98,8 +98,21 @@ case "${1:-help}" in
         $COMPOSE exec web bash
         ;;
     
-    # ✅ 新增：初始化命令（一键完成新环境搭建）
-    init|setup)
+    # ✅ 初始化命令（一键完成新环境搭建）
+        init|setup)
+        # ===================== 【新增】生产环境校验 =====================
+        ensure_env
+        # 读取 .env 中的 DEBUG 变量
+        DEBUG_VALUE=$(grep -E '^DEBUG=' .env | cut -d '=' -f2 | tr -d '"' | tr -d "'" || echo "false")
+        # 转小写并判断：如果 DEBUG=true，直接退出
+        if [[ "${DEBUG_VALUE,,}" == "true" || "${DEBUG_VALUE}" == "1" ]]; then
+            echo -e "${RED}❌ 禁止执行！${NC}"
+            echo -e "${RED}init/setup 命令【仅用于生产环境】！${NC}"
+            echo -e "${YELLOW}请修改 .env 文件：DEBUG=false 后重新执行${NC}"
+            exit 1
+        fi
+        # =================================================================
+
         echo -e "${BLUE}================================${NC}"
         echo -e "${BLUE}  🚀 初始化新环境 🔧${NC}"
         echo -e "${BLUE}================================${NC}"
@@ -194,32 +207,53 @@ case "${1:-help}" in
         $COMPOSE restart db redis
         ;;
 
-    # ===================== 【新增】开发环境本地初始化 =====================
+            # ===================== 开发环境本地初始化 =====================
     dev:init)
         echo -e "${BLUE}================================${NC}"
         echo -e "${BLUE}  🚀 本地开发环境初始化 🔧${NC}"
         echo -e "${BLUE}================================${NC}"
         echo
-        
+        # 启动数据库/Redis基础设施
+        ./start.sh dev:up
         cd django
-        # 1. 执行本地数据库迁移
-        echo -e "${YELLOW}📦 执行数据库迁移...${NC}"
+        
+        # 1. 创建/激活虚拟环境
+        echo -e "${YELLOW}📌 步骤 1/5：创建Python虚拟环境 (.venv)${NC}"
+        if [ ! -d ".venv" ]; then
+            python3 -m venv .venv
+            echo -e "${GREEN}✅ 虚拟环境创建成功${NC}"
+        else
+            echo -e "${GREEN}✅ 虚拟环境已存在${NC}"
+        fi
+
+        # 2. 安装依赖
+        echo -e "${YELLOW}🔧 步骤 2/5：激活虚拟环境 + 安装项目依赖${NC}"
+        source .venv/bin/activate && pip install --upgrade pip && pip install -r requirements.txt
+        echo -e "${GREEN}✅ 依赖安装完成${NC}"
+
+        # 3. 🔥 生成迁移文件（修复core_user表不存在的关键！）
+        echo -e "${YELLOW}🗄️ 步骤 3/5：生成数据库迁移文件...${NC}"
+        python manage.py makemigrations
+        echo -e "${GREEN}✅ 迁移文件生成完成${NC}"
+
+        # 4. 🔥 执行迁移（创建所有表，包括用户表）
+        echo -e "${YELLOW}🗄️ 步骤 4/5：执行数据库迁移...${NC}"
         python manage.py migrate --noinput
-        echo -e "${GREEN}✅ 迁移完成${NC}"
-        echo
-        
-        # 2. 创建本地超级管理员
-        echo -e "${YELLOW}👤 创建管理员账号:${NC}"
+        echo -e "${GREEN}✅ 数据库迁移完成${NC}"
+
+        # 5. 创建管理员
+        echo -e "${YELLOW}👤 步骤 5/5: 创建管理员账号:${NC}"
         python manage.py createsuperuser
-        
+
         # 完成提示
         echo
         echo -e "${GREEN}================================${NC}"
         echo -e "${GREEN}  ✨ 本地开发环境初始化完成！${NC}"
         echo -e "${GREEN}================================${NC}"
         echo
-        echo -e "  🔐 本地后台地址: ${GREEN}http://127.0.0.1:8000/admin/${NC}"
-        echo -e "  🚀 启动命令: ${GREEN}cd django && python3 manage.py runserver${NC}"
+        echo -e "🔓 激活虚拟环境命令: ${GREEN}cd django && source .venv/bin/activate${NC}"
+        echo -e "🚀 启动项目命令: ${GREEN}python manage.py runserver${NC}"
+        echo -e "🔐 本地后台地址: ${GREEN}http://127.0.0.1:8000/admin/${NC}"
         echo
         ;;
     # ====================================================================
