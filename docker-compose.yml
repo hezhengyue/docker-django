@@ -4,11 +4,7 @@ services:
   # 🖥️ Web 服务
   web:
     build: ./django
-    command: python manage.py runserver 0.0.0.0:8000
-    ports:
-      - "8000:8000"
     volumes:
-      - ./django:/app
       - static_volume:/app/staticfiles
       - media_volume:/app/media
       - logs_volume:/app/logs
@@ -60,7 +56,9 @@ services:
     image: redis:7.2.13-alpine3.21
     ports:
       - "6379:6379"
-    command: redis-server --appendonly yes
+    env_file:
+      - .env
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
     volumes:
       - redis_volume:/data
     networks:
@@ -81,7 +79,7 @@ services:
       - .env
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-postgres}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-Postgres1234}
       - POSTGRES_DB=${POSTGRES_DB:-db}
       - POSTGRES_PORT=${POSTGRES_PORT:-5432}
     volumes:
@@ -90,7 +88,7 @@ services:
       - django-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -p ${POSTGRES_PORT:-5432}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-Postgres1234} -p ${POSTGRES_PORT:-5432}"]
       interval: 10s
       timeout: 5s
       retries: 5

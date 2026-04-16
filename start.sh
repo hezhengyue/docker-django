@@ -38,7 +38,7 @@ ensure_cert() {
     mkdir -p nginx/ssl
     if [[ ! -f nginx/ssl/fullchain.pem || ! -f nginx/ssl/privkey.pem ]]; then
         echo -e "${BLUE}🔐 正在生成自签名证书...${NC}"
-        openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+        openssl req -x509 -nodes -days 3650 -newkey rsa:2048 \
             -keyout nginx/ssl/privkey.pem \
             -out nginx/ssl/fullchain.pem \
             -subj "/C=CN/ST=Beijing/L=Beijing/O=Dev/CN=localhost" 2>/dev/null
@@ -59,6 +59,9 @@ case "${1:-help}" in
         echo -e "  🔐 ${GREEN}https://localhost${NC}"
         echo -e "  🌐 ${GREEN}http://localhost${NC} (自动跳转)"
         echo -e "  💡 首次请运行: ${YELLOW}./start.sh init${NC}"
+        # ===================== 【新增】生产环境提醒 =====================
+        echo -e "\n${RED}⚠️  生产环境警告：请将 .env 文件中 DEBUG=false ！${NC}"
+        # ==============================================================
         ;;
     down|stop)
         echo -e "${BLUE}🛑 停止所有服务...${NC}"
@@ -77,9 +80,14 @@ case "${1:-help}" in
         $COMPOSE --profile full up -d
         ;;
     logs)
-        SERVICE="${2:-web}"
-        echo -e "${BLUE}📜 查看 ${SERVICE} 日志 (Ctrl+C 退出)...${NC}"
-        $COMPOSE logs -f "$SERVICE"
+        if [[ -n "$2" ]]; then
+            SERVICE="$2"
+            echo -e "${BLUE}📜 查看 ${SERVICE} 日志 (Ctrl+C 退出)...${NC}"
+            $COMPOSE logs -f "$SERVICE"
+        else
+            echo -e "${BLUE}📜 查看所有服务日志 (Ctrl+C 退出)...${NC}"
+            $COMPOSE logs -f
+        fi
         ;;
     shell)
         echo -e "${BLUE}🐍 进入 Django Shell...${NC}"
@@ -170,7 +178,7 @@ case "${1:-help}" in
         ensure_env
         $COMPOSE up -d db redis  # 👈 不加 --profile，自动跳过带 ["full"] 标签的服务
         echo -e "${GREEN}✅ 已启动: PostgreSQL(5432) + Redis(6379)${NC}"
-        echo -e "${YELLOW}💡 现在可本地运行: cd django && python manage.py runserver 0.0.0.0:8000${NC}"
+        echo -e "${YELLOW}💡 现在可本地运行: ./start.sh dev:init 开发环境本地初始化"
         ;;
     
     dev:down)
@@ -185,6 +193,36 @@ case "${1:-help}" in
         echo -e "${BLUE}🔄 重启开发基础设施...${NC}"
         $COMPOSE restart db redis
         ;;
+
+    # ===================== 【新增】开发环境本地初始化 =====================
+    dev:init)
+        echo -e "${BLUE}================================${NC}"
+        echo -e "${BLUE}  🚀 本地开发环境初始化 🔧${NC}"
+        echo -e "${BLUE}================================${NC}"
+        echo
+        
+        cd django
+        # 1. 执行本地数据库迁移
+        echo -e "${YELLOW}📦 执行数据库迁移...${NC}"
+        python manage.py migrate --noinput
+        echo -e "${GREEN}✅ 迁移完成${NC}"
+        echo
+        
+        # 2. 创建本地超级管理员
+        echo -e "${YELLOW}👤 创建管理员账号:${NC}"
+        python manage.py createsuperuser
+        
+        # 完成提示
+        echo
+        echo -e "${GREEN}================================${NC}"
+        echo -e "${GREEN}  ✨ 本地开发环境初始化完成！${NC}"
+        echo -e "${GREEN}================================${NC}"
+        echo
+        echo -e "  🔐 本地后台地址: ${GREEN}http://127.0.0.1:8000/admin/${NC}"
+        echo -e "  🚀 启动命令: ${GREEN}cd django && python3 manage.py runserver${NC}"
+        echo
+        ;;
+    # ====================================================================
     
     help|--help|-h|*)
         echo -e "${BLUE}================================${NC}"
@@ -210,11 +248,15 @@ case "${1:-help}" in
         echo -e "  ${YELLOW}dev:up${NC}         🧑‍💻 开发模式: 只启动 db+redis (本地跑 Django)"
         echo -e "  ${YELLOW}dev:down${NC}       停止开发基础设施"
         echo -e "  ${YELLOW}dev:restart${NC}    重启开发基础设施"
+        echo -e "  ${YELLOW}dev:init${NC}       ✨ 本地开发环境初始化(迁移+静态文件+管理员)" # 新增帮助
         echo -e "  ${YELLOW}help${NC}             显示此帮助"
         echo
         echo -e "${YELLOW}💡 提示:${NC}"
         echo -e "   • 开发模式: ${GREEN}./start.sh dev:up${NC} → 本地 ${GREEN}python manage.py runserver${NC}"
         echo -e "   • 全量模式: ${GREEN}./start.sh up${NC} → 容器内完整环境"
         echo -e "   • 确保 .env 中 ${GREEN}POSTGRES_HOST=localhost${NC} 以便本地连接"
+        # ===================== 【新增】帮助文档提醒 =====================
+        echo -e "   • ${RED}生产环境必须将 .env 中 DEBUG=false ！${NC}"
+        # ==============================================================
         ;;
 esac

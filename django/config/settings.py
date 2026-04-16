@@ -1,10 +1,13 @@
-"""Django 核心配置 - 所有业务参数从 .env 读取，保留安全默认值"""
+"""
+docker-django/django/config/settings.py
+"""
 import os
 import sys
 import re
 from pathlib import Path
 from django.core.exceptions import ImproperlyConfigured
 import environ
+from urllib.parse import quote_plus
 
 
 # 🔧 工具函数：将 '50M'/'2G' 解析为字节数，兼容纯数字
@@ -29,62 +32,24 @@ def parse_size(value: str | int) -> int:
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# 📦 环境变量初始化：声明所有支持的变量、类型、安全兜底默认值
-env = environ.Env(
-    # 🔐 核心安全 (用户必配)
-    SECRET_KEY=(str, ''),
-    DEBUG=(bool, False),
-    PROJECT_NAME=(str, 'docker-django'),
-
-    # 🌐 访问控制 (用户必配)
-    ALLOWED_HOSTS=(list, []),
-    CSRF_TRUSTED_ORIGINS=(list, []),
-    TRUSTED_PROXIES=(list, ['127.0.0.1', '::1']),
-
-    # 🔑 会话配置 (按需调整)
-    SESSION_COOKIE_AGE=(int, 1200),
-    CSRF_COOKIE_SECURE=(bool, False),
-    SESSION_COOKIE_SECURE=(bool, False),
-
-    # 🗄️ 数据库配置 (自动拼接)
-    DATABASE_URL=(str, ''),
-    POSTGRES_HOST=(str, 'db'),
-    POSTGRES_PORT=(str, '5432'),
-
-    # 🚀 异步任务 (Celery)
-    CELERY_BROKER_URL=(str, 'redis://redis:6379/0'),
-    CELERY_RESULT_BACKEND=(str, 'redis://redis:6379/0'),
-    CELERY_TASK_TIME_LIMIT=(int, 300),
-
-    # 📝 日志配置
-    LOG_LEVEL=(str, 'DEBUG'),
-    LOG_FILE_LEVEL=(str, 'INFO'),
-    LOG_RETENTION_DAYS=(int, 30),
-
-    # 📁 文件上传限制
-    DATA_UPLOAD_MAX_MEMORY_SIZE=(str, '50M'),
-    FILE_UPLOAD_MAX_MEMORY_SIZE=(str, '50M'),
-
-    # 🌏 国际化配置
-    LANGUAGE_CODE=(str, 'zh-hans'),
-    TIME_ZONE=(str, 'Asia/Shanghai'),
-    USE_TZ=(bool, True),
-)
-
+# 📦 环境变量初始化：
+env = environ.Env()
 # 🔍 加载环境变量：优先级 .env.local > .env > 默认值。支持本地覆盖不提交
 environ.Env.read_env(BASE_DIR.parent / '.env')
 environ.Env.read_env(BASE_DIR.parent / '.env.local')
 
 
 # 📌 读取核心配置：无默认值变量必须存在，否则启动报错
-SECRET_KEY = env('SECRET_KEY')
-DEBUG = env('DEBUG')
-PROJECT_NAME = env('PROJECT_NAME')
+SECRET_KEY = env('SECRET_KEY', default='')
+DEBUG = env.bool('DEBUG', default=False)
+PROJECT_NAME = env('PROJECT_NAME', default='docker-django')
+
 
 # ⚠️ ALLOWED_HOSTS 空列表时：开发放行所有(*)，生产回退安全白名单
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS') or (['*'] if DEBUG else ['localhost', '127.0.0.1'])
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS')
-TRUSTED_PROXIES = env.list('TRUSTED_PROXIES')
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['http://localhost', 'http://127.0.0.1'])
+TRUSTED_PROXIES = env.list('TRUSTED_PROXIES', default=['127.0.0.1', '::1'])
+
 
 # 👤 自定义用户模型：固定指向 core.User，避免 .env 误配导致启动失败
 AUTH_USER_MODEL = 'core.User'
@@ -114,6 +79,7 @@ MIDDLEWARE = [
     'core.middleware.RealIPMiddleware',
 ]
 
+
 ROOT_URLCONF = 'config.urls'
 WSGI_APPLICATION = 'config.wsgi.application'
 
@@ -134,18 +100,74 @@ TEMPLATES = [{
 }]
 
 
-# 🗄️ 数据库智能拼接：优先读 DATABASE_URL(.env) → 缺失则用 POSTGRES_* 拼 → 兜底安全报错
-_db = env('DATABASE_URL', default='')
-if not _db:
-    _db = (
-        f"postgresql://"
-        f"{os.getenv('POSTGRES_USER', 'postgres')}:"
-        f"{os.getenv('POSTGRES_PASSWORD', 'postgres')}@"
-        f"{os.getenv('POSTGRES_HOST', 'db')}:"
-        f"{os.getenv('POSTGRES_PORT', '5432')}/"
-        f"{os.getenv('POSTGRES_DB', 'db')}"
-    )
-DATABASES = {'default': env.db_url('DATABASE_URL', default=_db)}
+# 🌏 国际化：语言/时区/启用开关。USE_TZ=true 确保跨时区部署时间不混乱
+LANGUAGE_CODE = env('LANGUAGE_CODE', default='zh-hans')
+TIME_ZONE = env('TIME_ZONE', default='Asia/Shanghai')
+USE_I18N = True
+USE_TZ = env.bool('USE_TZ', default=True)
+
+
+# 🗄️ 数据库配置（终极版：自动识别 本地/容器）
+# 标准判断：容器内存在 /.dockerenv 文件
+IN_DOCKER = os.path.exists("/.dockerenv")
+
+
+# 🗄️ 数据库配置：直接使用 POSTGRES_* 变量拼接，无需 DATABASE_URL
+POSTGRES_HOST = env('POSTGRES_HOST', default='db')
+if IN_DOCKER:
+    POSTGRES_HOST = "db"
+POSTGRES_PORT = env('POSTGRES_PORT', default='5432')
+POSTGRES_USER = env('POSTGRES_USER', default='postgres')
+POSTGRES_PASSWORD = env('POSTGRES_PASSWORD', default='Postgres1234')
+POSTGRES_DB = env('POSTGRES_DB', default='db')
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql',
+        'NAME': POSTGRES_DB,
+        'USER': POSTGRES_USER,
+        'PASSWORD': POSTGRES_PASSWORD,
+        'HOST': POSTGRES_HOST,
+        'PORT': POSTGRES_PORT,
+        'CONN_MAX_AGE': 600,  # 连接复用，提升性能
+        'CONN_HEALTH_CHECKS': True,  # Django 4.1+ 自动检测断连重连
+    }
+}
+
+
+# 🚀 Redis 配置智能拼接：使用 REDIS_* 变量构建 URL
+REDIS_HOST = env('REDIS_HOST', default='redis')
+if IN_DOCKER:
+    REDIS_HOST = "redis"
+REDIS_PORT = env('REDIS_PORT', default='6379')
+REDIS_PASSWORD = env('REDIS_PASSWORD', default='Redis1234')
+REDIS_DB = env.int('REDIS_DB', default=0)
+# 🔐 密码转义 + 构建 URL
+_redis_auth = f':{quote_plus(REDIS_PASSWORD)}@' if REDIS_PASSWORD else ''
+# 基础 Redis URL（用于缓存等）
+REDIS_URL = f"redis://{_redis_auth}{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}"
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'SOCKET_CONNECT_TIMEOUT': 5,
+            'SOCKET_TIMEOUT': 5,
+        }
+    }
+}
+
+
+# 🚀 Celery 配置：读取 Broker/Backend/超时。统一 JSON 序列化保证跨语言兼容
+CELERY_BROKER_DB = env.int('CELERY_BROKER_DB', default=1)
+CELERY_RESULT_BACKEND_DB = env.int('CELERY_RESULT_BACKEND_DB', default=2)
+CELERY_BROKER_URL = f"redis://{_redis_auth}{REDIS_HOST}:{REDIS_PORT}/{CELERY_BROKER_DB}"
+CELERY_RESULT_BACKEND = f"redis://{_redis_auth}{REDIS_HOST}:{REDIS_PORT}/{CELERY_RESULT_BACKEND_DB}"
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=300)
 
 
 # 🔐 密码校验器：防弱密码/与用户名相似/常见字典密码
@@ -159,19 +181,12 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # 🔑 会话引擎：cached_db 兼顾性能与持久化。Cookie 安全标志按 .env 动态切换
 SESSION_ENGINE = 'django.contrib.sessions.backends.cached_db'
-SESSION_COOKIE_AGE = env('SESSION_COOKIE_AGE')
-CSRF_COOKIE_SECURE = env('CSRF_COOKIE_SECURE')
-SESSION_COOKIE_SECURE = env('SESSION_COOKIE_SECURE')
-
+SESSION_COOKIE_AGE = env.int('SESSION_COOKIE_AGE', default=1200)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=False)
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=False)
 # 🌐 代理 HTTPS 标识：Nginx 终止 SSL 时，Django 识别 request.is_secure() 的必备头
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-
-# 🌏 国际化：语言/时区/启用开关。USE_TZ=true 确保跨时区部署时间不混乱
-LANGUAGE_CODE = env('LANGUAGE_CODE')
-TIME_ZONE = env('TIME_ZONE')
-USE_I18N = True
-USE_TZ = env('USE_TZ')
 
 
 # 📁 静态/媒体文件：Django 5.x 新 STORAGES 语法。自动创建目录防启动报错
@@ -188,23 +203,16 @@ for p in (STATIC_ROOT, MEDIA_ROOT):
 
 
 # 📤 上传限制：解析 .env 友好单位('50M') 为字节数
-DATA_UPLOAD_MAX_MEMORY_SIZE = parse_size(env('DATA_UPLOAD_MAX_MEMORY_SIZE'))
-FILE_UPLOAD_MAX_MEMORY_SIZE = parse_size(env('FILE_UPLOAD_MAX_MEMORY_SIZE'))
-
-
-# 🚀 Celery 配置：读取 Broker/Backend/超时。统一 JSON 序列化保证跨语言兼容
-CELERY_BROKER_URL = env('CELERY_BROKER_URL')
-CELERY_RESULT_BACKEND = env('CELERY_RESULT_BACKEND')
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = TIME_ZONE
-CELERY_TASK_TIME_LIMIT = env('CELERY_TASK_TIME_LIMIT')
+DATA_UPLOAD_MAX_MEMORY_SIZE = parse_size(env.str('DATA_UPLOAD_MAX_MEMORY_SIZE', default=52428800))
+FILE_UPLOAD_MAX_MEMORY_SIZE = parse_size(env.str('FILE_UPLOAD_MAX_MEMORY_SIZE', default=52428800))
 
 
 # 📝 日志配置：开发彩色控制台 + 生产 JSON + 按天轮转文件。保留天数从 .env 读取
 LOG_DIR = BASE_DIR / 'logs'
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+LOG_LEVEL = env('LOG_LEVEL', default='DEBUG').upper()
+LOG_FILE_LEVEL = env('LOG_FILE_LEVEL', default='INFO').upper()
+LOG_RETENTION_DAYS = env.int('LOG_RETENTION_DAYS', default=30)
 
 LOGGING = {
     'version': 1,
@@ -233,7 +241,7 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'dev' if DEBUG else 'prod',
             'stream': sys.stdout,
-            'level': env('LOG_LEVEL'),
+            'level': LOG_LEVEL,
         },
         'app_file': {
             'class': 'logging.handlers.TimedRotatingFileHandler',
@@ -241,9 +249,9 @@ LOGGING = {
             'filename': LOG_DIR / 'app.log',
             'when': 'midnight',
             'interval': 1,
-            'backupCount': env('LOG_RETENTION_DAYS'),
+            'backupCount': LOG_RETENTION_DAYS,
             'encoding': 'utf-8',
-            'level': env('LOG_FILE_LEVEL'),
+            'level': LOG_FILE_LEVEL,
             'delay': True,
         },
         'error_file': {
@@ -252,7 +260,7 @@ LOGGING = {
             'filename': LOG_DIR / 'error.log',
             'when': 'midnight',
             'interval': 1,
-            'backupCount': env('LOG_RETENTION_DAYS'),
+            'backupCount': LOG_RETENTION_DAYS,
             'encoding': 'utf-8',
             'level': 'ERROR',
             'delay': True,
@@ -263,7 +271,7 @@ LOGGING = {
             'filename': LOG_DIR / 'django.log',
             'when': 'midnight',
             'interval': 1,
-            'backupCount': env('LOG_RETENTION_DAYS'),
+            'backupCount': LOG_RETENTION_DAYS,
             'encoding': 'utf-8',
             'level': 'INFO' if DEBUG else 'WARNING',
             'delay': True,
@@ -271,7 +279,7 @@ LOGGING = {
     },
     'root': {
         'handlers': ['console', 'app_file'],
-        'level': env('LOG_LEVEL'),
+        'level': LOG_LEVEL,
     },
     'loggers': {
         'django': {
@@ -301,11 +309,22 @@ if not DEBUG:
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
-# 🛡️ 生产安全拦截：DEBUG=false 时强制检查密钥/密码/Host，防止危险配置上线
+# 🛡️ 生产环境安全拦截（放在文件末尾，DEBUG 判断之后）
 if not DEBUG:
-    if SECRET_KEY.startswith('django-insecure'):
-        raise ImproperlyConfigured("生产环境 SECRET_KEY 必须更换！")
-    if DATABASES['default'].get('PASSWORD') in ('', 'postgres', None):
-        raise ImproperlyConfigured("生产环境数据库密码不能为空或默认值！")
+    if not SECRET_KEY or SECRET_KEY.startswith('django-insecure'):
+        raise ImproperlyConfigured("生产环境 SECRET_KEY 必须更换且不能为空！")
+    
+    # 检查数据库密码（注意：此时密码是原始值，未转义）
+    if not POSTGRES_PASSWORD or POSTGRES_PASSWORD in ('postgres', 'password', '123456'):
+        raise ImproperlyConfigured("生产环境数据库密码不能为空或弱密码！")
+    
     if '*' in ALLOWED_HOSTS:
-        raise ImproperlyConfigured("生产环境 ALLOWED_HOSTS 禁止使用 *！")
+        raise ImproperlyConfigured("生产环境 ALLOWED_HOSTS 禁止使用 * ！")
+    
+    # 可选：检查 CSRF_TRUSTED_ORIGINS 是否包含 https（生产建议）
+    if not any(origin.startswith('https://') for origin in CSRF_TRUSTED_ORIGINS):
+        import warnings
+        warnings.warn(
+            "生产环境建议 CSRF_TRUSTED_ORIGINS 配置 https:// 开头的域名",
+            RuntimeWarning
+        )

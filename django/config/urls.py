@@ -14,7 +14,6 @@ def health_check(request):
     return JsonResponse({
         "status": "healthy",
         "service": getattr(settings, 'PROJECT_NAME', 'unknown'),
-        "version": "1.0.0"
     })
 
 def root_redirect(request):
