@@ -30,8 +30,7 @@ def parse_size(value: str | int) -> int:
 
 # 📂 项目根目录：config/settings.py 所在目录的父级
 BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_NAME = env('PROJECT_NAME', default='docker-django')
-
+PROJECT_NAME = BASE_DIR.name
 
 # 📦 环境变量初始化：
 env = environ.Env()
