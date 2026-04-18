@@ -30,6 +30,7 @@ def parse_size(value: str | int) -> int:
 
 # 📂 项目根目录：config/settings.py 所在目录的父级
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_NAME = env('PROJECT_NAME', default='docker-django')
 
 
 # 📦 环境变量初始化：
@@ -42,7 +43,6 @@ environ.Env.read_env(BASE_DIR.parent / '.env.local')
 # 📌 读取核心配置：无默认值变量必须存在，否则启动报错
 SECRET_KEY = env('SECRET_KEY', default='')
 DEBUG = env.bool('DEBUG', default=False)
-PROJECT_NAME = env('PROJECT_NAME', default='docker-django')
 
 
 # ⚠️ ALLOWED_HOSTS 空列表时：开发放行所有(*)，生产回退安全白名单
