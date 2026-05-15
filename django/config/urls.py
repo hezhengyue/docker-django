@@ -1,13 +1,11 @@
-"""
-docker-django/django/config/urls.py - Django 项目 URL 配置
-"""
-
+# config/urls.py
 from django.contrib import admin
 from django.urls import path,include
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.conf import settings
 from django.conf.urls.static import static
+from core.views import (start_test_task, websocket_test, )
 
 def health_check(request):
     """健康检查端点 - Docker/K8s/云厂商使用"""
@@ -24,6 +22,16 @@ urlpatterns = [
     path('', root_redirect, name='root'),
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health'),
+
+    path(
+        "api/test-task/",
+        start_test_task
+    ),
+
+    path(
+        "test/",
+        websocket_test
+    ),
 ]
 
 if settings.DEBUG:

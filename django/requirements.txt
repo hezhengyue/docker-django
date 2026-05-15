@@ -1,3 +1,4 @@
+# requirements.txt
 # ===================== Django 核心（固定版本） =====================
 Django>=5.2,<5.3
 gunicorn
@@ -15,3 +16,14 @@ psycopg[binary]  # 🔑 Django 5.2 官方推荐的新驱动
 # ===================== 缓存/队列 =====================
 django-redis
 celery[redis]
+django-celery-beat
+
+# ===================== websocket =====================
+channels
+channels-redis
+uvicorn[standard]
+daphne
+
+# ===================== 导入导出文件 =====================
+pandas
+openpyxl

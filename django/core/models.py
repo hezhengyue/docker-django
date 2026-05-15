@@ -1,6 +1,4 @@
-"""
-docker-django/django/core/models.py - Django 项目核心模型定义
-"""
+# core/models.py
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from django.core.validators import RegexValidator

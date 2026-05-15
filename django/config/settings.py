@@ -1,6 +1,5 @@
-"""
-docker-django/django/config/settings.py
-"""
+# config/settings.py
+
 import os
 import sys
 import re
@@ -63,6 +62,8 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
+    'common',
+    'django_celery_beat',
 ]
 
 
@@ -75,7 +76,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'core.middleware.RealIPMiddleware',
+    "common.middleware.real_ip.RealIPMiddleware"
 ]
 
 
@@ -167,6 +168,25 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=300)
+
+# websocket
+INSTALLED_APPS += [
+    "channels",
+]
+ASGI_APPLICATION = "config.asgi.application"
+CHANNEL_REDIS_DB = env.int("CHANNEL_REDIS_DB", default=3)
+CHANNEL_REDIS_URL = (f"redis://{_redis_auth}{REDIS_HOST}:{REDIS_PORT}/{CHANNEL_REDIS_DB}")
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": (
+            "channels_redis.core."
+            "RedisChannelLayer"
+        ),
+        "CONFIG": {
+            "hosts": [CHANNEL_REDIS_URL],
+        },
+    },
+}
 
 
 # 🔐 密码校验器：防弱密码/与用户名相似/常见字典密码
@@ -327,3 +347,6 @@ if not DEBUG:
             "生产环境建议 CSRF_TRUSTED_ORIGINS 配置 https:// 开头的域名",
             RuntimeWarning
         )
+
+
+

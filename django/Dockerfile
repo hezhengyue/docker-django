@@ -1,12 +1,18 @@
-FROM python:3.12-slim
+# Dockerfile
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
+RUN rm -f /etc/apt/sources.list.d/debian.sources && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm main contrib non-free non-free-firmware" > /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian bookworm-updates main contrib non-free non-free-firmware" >> /etc/apt/sources.list && \
+    echo "deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware" >> /etc/apt/sources.list
+
 # 🔧 1. 系统依赖安装（🔑 必须在 USER 之前，此时是 root 用户）
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential libpq-dev curl git \
+    curl \
     && rm -rf /var/lib/apt/lists/*
 
 # 🔧 2. pip 配置（🔑 必须在 USER 之前）
@@ -30,4 +36,4 @@ USER appuser
 EXPOSE 8000
 
 # 🎯 默认命令
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--threads", "2"]
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]

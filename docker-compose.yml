@@ -1,7 +1,6 @@
-# docker-compose.yml - 修复 YAML 语法错误
+# docker-compose.yml
 
 services:
-  # 🖥️ Web 服务
   web:
     build: ./django
     volumes:
@@ -28,19 +27,18 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
-    profiles: ["full"]
 
-
-  # ⚙️ Celery Worker
-  celery-worker:
+  # Celery Worker 服务：处理异步任务
+  celery:
     build: ./django
     command: celery -A config worker -l info -c 2
     volumes:
+      - media_volume:/app/media
       - logs_volume:/app/logs
     env_file:
       - .env
     environment:
-      - LOG_DIR=/app/logs
+      - DJANGO_SETTINGS_MODULE=config.settings
     depends_on:
       redis:
         condition: service_healthy
@@ -49,16 +47,48 @@ services:
     networks:
       - django-net
     restart: unless-stopped
-    profiles: ["full"]
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
 
-  # 💾 Redis
+  # Celery Beat 服务：定时调度任务
+  celery-beat:
+    build: ./django
+    command: celery -A config beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - logs_volume:/app/logs
+    env_file:
+      - .env
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
+    depends_on:
+      redis:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+    networks:
+      - django-net
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+
   redis:
     image: redis:7.2.13-alpine3.21
     ports:
       - "6379:6379"
     env_file:
       - .env
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD}
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - ${REDIS_PASSWORD}
     volumes:
       - redis_volume:/data
     networks:
@@ -70,7 +100,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # 🗄️ PostgreSQL
   db:
     image: postgres:15.17-alpine3.23
     ports:
@@ -93,7 +122,6 @@ services:
       timeout: 5s
       retries: 5
 
-  # 🌐 Nginx
   nginx:
     image: nginx:1.26.3-alpine3.20
     ports:
@@ -101,7 +129,8 @@ services:
       - "443:443"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro 
       - static_volume:/app/staticfiles:ro
       - media_volume:/app/media:ro
       - nginx_logs:/var/log/nginx
@@ -116,9 +145,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    profiles: ["full"]
 
-# 💽 数据卷（✅ 每个独占一行）
 volumes:
   static_volume:
   media_volume:
@@ -127,7 +154,6 @@ volumes:
   postgres_volume:
   nginx_logs:
 
-# 🌍 网络
 networks:
   django-net:
     driver: bridge
