@@ -344,6 +344,13 @@ EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # SERVER_EMAIL = EMAIL_HOST_USER
 
+# django-auditlog配置
+INSTALLED_APPS +=  [
+    'auditlog',
+]
+MIDDLEWARE += [
+    'auditlog.middleware.AuditlogMiddleware',
+]
 
 
 # 🛡️ 生产环境安全拦截（放在文件末尾，DEBUG 判断之后）
