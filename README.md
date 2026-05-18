@@ -14,6 +14,9 @@ chmod +x start.sh
 # 启动服务 + 初始化数据库 + 创建管理员
 ./start.sh init
 
+# 更新
+./start.sh update
+
 # 打印指定目录的文件内容
 find django -type f \( -name "*.py" -o -name "*.json" -o -name "*.yml" -o -name "*.yaml" -o -name "*.env" -o -name "*.txt" -o -name "*.md" \) \
 ! -path '*/.*/' \

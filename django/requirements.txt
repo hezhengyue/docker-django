@@ -16,14 +16,10 @@ psycopg[binary]  # 🔑 Django 5.2 官方推荐的新驱动
 # ===================== 缓存/队列 =====================
 django-redis
 celery[redis]
+
+# ===================== 定时任务 =====================
 django-celery-beat
 
-# ===================== websocket =====================
-channels
-channels-redis
-uvicorn[standard]
-daphne
-
 # ===================== 导入导出文件 =====================
-pandas
-openpyxl
+django-import-export
+django-import-export-extensions

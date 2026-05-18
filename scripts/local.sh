@@ -98,7 +98,7 @@ run_local_dev() {
     # 🚀 Django Daphne ASGI Server (替换 runserver)
     # =========================================================================
 
-    daphne -b 127.0.0.1 -p 8000 config.asgi:application &
+    MANAGE runserver &
 
     # =========================================================================
     # Celery Worker Hot Reload
