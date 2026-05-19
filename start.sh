@@ -50,6 +50,7 @@ case "${1:-help}" in
 
     update)
         ensure_env
+        ensure_cert
 
         log_info "更新生产环境"
 
@@ -62,6 +63,8 @@ case "${1:-help}" in
         run_migrations
 
         MANAGE collectstatic --noinput
+
+        ensure_superuser
 
         $COMPOSE restart web celery celery-beat
 
