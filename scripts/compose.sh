@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# scripts/compose.sh
 
 # =============================================================================
 # 🐳 Docker Compose Detection

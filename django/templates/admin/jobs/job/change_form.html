@@ -1,0 +1,68 @@
+{% extends "admin/change_form.html" %}
+
+{% block extrahead %}
+{{ block.super }}
+
+<script>
+
+document.addEventListener('DOMContentLoaded', function () {
+
+    const jobId = "{{ original.id }}"
+
+    let timer = null
+
+    async function refreshJob() {
+
+        try {
+
+            const response = await fetch(
+                `/jobs/${jobId}/`
+            )
+
+            if (!response.ok) {
+                return
+            }
+
+            const data = await response.json()
+
+            const progressText = document.getElementById(
+                'job-progress-text'
+            )
+
+            if (progressText) {
+
+                progressText.innerHTML =
+                    `${data.progress}% (${data.current}/${data.total})`
+            }
+
+            // 任务结束停止轮询
+
+            if (
+                data.status === 'success' ||
+                data.status === 'failed'
+            ) {
+
+                clearInterval(timer)
+
+                // 自动刷新整个页面
+                location.reload()
+            }
+
+        } catch (e) {
+
+            console.error(e)
+        }
+    }
+
+    refreshJob()
+
+    timer = setInterval(
+        refreshJob,
+        2000
+    )
+
+})
+
+</script>
+
+{% endblock %}

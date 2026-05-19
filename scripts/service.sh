@@ -1,3 +1,4 @@
+# scripts/service.sh
 wait_for_service() {
 
     local service="$1"

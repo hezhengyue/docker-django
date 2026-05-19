@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# scripts/django.sh
 
 run_migrations() {
 

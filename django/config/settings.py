@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'core',
     'common',
+    'jobs',
 ]
 
 
@@ -167,6 +168,7 @@ CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TIME_LIMIT = env.int('CELERY_TASK_TIME_LIMIT', default=300)
+
 
 
 
@@ -326,23 +328,25 @@ IMPORT_EXPORT_SKIP_ADMIN_CONFIRM = False
 
 
 
-# email 配置：使用 SMTP 后端，参数从 .env 读取。生产环境务必设置 EMAIL_HOST_PASSWORD（授权码）
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST = env('EMAIL_HOST')
-EMAIL_PORT = env('EMAIL_PORT', default=25) 
-# 🔹 读取协议（统一小写 + 校验）
-EMAIL_PROTOCOL = env.str('EMAIL_PROTOCOL', default='ssl').strip().lower()
-VALID_PROTOCOLS = {'ssl', 'tls', 'none'}
-if EMAIL_PROTOCOL not in VALID_PROTOCOLS:
-    raise ValueError(f"EMAIL_PROTOCOL 必须是 {VALID_PROTOCOLS} 之一，当前值: '{EMAIL_PROTOCOL}'")
-# 🔹 自动转换为 Django 需要的布尔配置
-EMAIL_USE_SSL = (EMAIL_PROTOCOL == 'ssl')
-EMAIL_USE_TLS = (EMAIL_PROTOCOL == 'tls')
-# none 时两者都为 False，使用明文 SMTP（仅内网测试）
-EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD') 
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-# SERVER_EMAIL = EMAIL_HOST_USER
+# # email 配置：使用 SMTP 后端，参数从 .env 读取。生产环境务必设置 EMAIL_HOST_PASSWORD（授权码）
+# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+# EMAIL_HOST = env('EMAIL_HOST')
+# EMAIL_PORT = env('EMAIL_PORT', default=25) 
+# # 🔹 读取协议（统一小写 + 校验）
+# EMAIL_PROTOCOL = env.str('EMAIL_PROTOCOL', default='ssl').strip().lower()
+# VALID_PROTOCOLS = {'ssl', 'tls', 'none'}
+# if EMAIL_PROTOCOL not in VALID_PROTOCOLS:
+#     raise ValueError(f"EMAIL_PROTOCOL 必须是 {VALID_PROTOCOLS} 之一，当前值: '{EMAIL_PROTOCOL}'")
+# # 🔹 自动转换为 Django 需要的布尔配置
+# EMAIL_USE_SSL = (EMAIL_PROTOCOL == 'ssl')
+# EMAIL_USE_TLS = (EMAIL_PROTOCOL == 'tls')
+# # none 时两者都为 False，使用明文 SMTP（仅内网测试）
+# EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+# EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD') 
+# DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+
 
 # django-auditlog配置
 INSTALLED_APPS +=  [

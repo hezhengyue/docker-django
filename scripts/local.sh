@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# scripts/local.sh
 
 # =============================================================================
 # 🧑‍💻 Enter Local Python Environment

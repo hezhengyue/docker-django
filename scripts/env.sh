@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
+# scripts/env.sh
 
 SERVICES_FULL="db redis celery celery-beat web nginx"
 SERVICES_DEV="db redis"
 
-APPS_LIST="core"
+APPS_LIST="core jobs"
 
 PRIORITY_APP="${PRIORITY_APP:-${APPS_LIST%% *}}"
 

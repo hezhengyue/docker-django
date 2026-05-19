@@ -22,7 +22,6 @@ django-celery-beat
 
 # ===================== 导入导出excel =====================
 django-import-export
-django-import-export-extensions
 
 # ===================== 审计 =====================
 django-auditlog

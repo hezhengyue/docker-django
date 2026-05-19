@@ -21,6 +21,7 @@ urlpatterns = [
     path('', root_redirect, name='root'),
     path('admin/', admin.site.urls),
     path('health/', health_check, name='health'),
+    path('jobs/', include('jobs.urls')),
 ]
 
 if settings.DEBUG:
