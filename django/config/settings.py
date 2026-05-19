@@ -4,6 +4,7 @@ import os
 import sys
 import re
 from pathlib import Path
+from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
 import environ
 from urllib.parse import quote_plus
@@ -312,6 +313,52 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 
+# email 配置：使用 SMTP 后端，参数从 .env 读取。生产环境务必设置 EMAIL_HOST_PASSWORD（授权码）
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = env('EMAIL_HOST')
+EMAIL_PORT = env('EMAIL_PORT', default=25) 
+# 🔹 读取协议（统一小写 + 校验）
+EMAIL_PROTOCOL = env.str('EMAIL_PROTOCOL', default='ssl').strip().lower()
+VALID_PROTOCOLS = {'ssl', 'tls', 'none'}
+if EMAIL_PROTOCOL not in VALID_PROTOCOLS:
+    raise ValueError(f"EMAIL_PROTOCOL 必须是 {VALID_PROTOCOLS} 之一，当前值: '{EMAIL_PROTOCOL}'")
+# 🔹 自动转换为 Django 需要的布尔配置
+EMAIL_USE_SSL = (EMAIL_PROTOCOL == 'ssl')
+EMAIL_USE_TLS = (EMAIL_PROTOCOL == 'tls')
+# none 时两者都为 False，使用明文 SMTP（仅内网测试）
+EMAIL_HOST_USER = env('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD') 
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+# EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# django-axes配置
+INSTALLED_APPS += [
+    'axes',
+]
+# 插入到 AuthenticationMiddleware 后面
+auth_index = MIDDLEWARE.index('django.contrib.auth.middleware.AuthenticationMiddleware')
+
+MIDDLEWARE.insert(auth_index + 1, 'axes.middleware.AxesMiddleware')
+AUTHENTICATION_BACKENDS = [
+    'axes.backends.AxesStandaloneBackend',
+    'django.contrib.auth.backends.ModelBackend',
+]
+# 登录失败限制
+AXES_FAILURE_LIMIT = 5
+# 封禁时间
+AXES_COOLOFF_TIME = timedelta(hours=1)
+# IP + 用户名联合封禁
+AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
+# 登录成功自动重置
+AXES_RESET_ON_SUCCESS = True
+# Admin 后台
+AXES_ENABLE_ADMIN = True
+# 返回403
+AXES_HTTP_RESPONSE_CODE = 403
+# 使用 Redis 缓存
+AXES_CACHE = 'default'
+
+
 # django_celery_beat配置
 INSTALLED_APPS += [
     'django_celery_beat',
@@ -328,23 +375,7 @@ IMPORT_EXPORT_SKIP_ADMIN_CONFIRM = False
 
 
 
-# # email 配置：使用 SMTP 后端，参数从 .env 读取。生产环境务必设置 EMAIL_HOST_PASSWORD（授权码）
-# EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
-# EMAIL_HOST = env('EMAIL_HOST')
-# EMAIL_PORT = env('EMAIL_PORT', default=25) 
-# # 🔹 读取协议（统一小写 + 校验）
-# EMAIL_PROTOCOL = env.str('EMAIL_PROTOCOL', default='ssl').strip().lower()
-# VALID_PROTOCOLS = {'ssl', 'tls', 'none'}
-# if EMAIL_PROTOCOL not in VALID_PROTOCOLS:
-#     raise ValueError(f"EMAIL_PROTOCOL 必须是 {VALID_PROTOCOLS} 之一，当前值: '{EMAIL_PROTOCOL}'")
-# # 🔹 自动转换为 Django 需要的布尔配置
-# EMAIL_USE_SSL = (EMAIL_PROTOCOL == 'ssl')
-# EMAIL_USE_TLS = (EMAIL_PROTOCOL == 'tls')
-# # none 时两者都为 False，使用明文 SMTP（仅内网测试）
-# EMAIL_HOST_USER = env('EMAIL_HOST_USER')
-# EMAIL_HOST_PASSWORD = env('EMAIL_HOST_PASSWORD') 
-# DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
 
 
 

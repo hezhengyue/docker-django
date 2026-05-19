@@ -26,3 +26,6 @@ django-import-export
 # ===================== 审计 =====================
 django-auditlog
 django-ipware
+
+# ===================== 防暴力破解 =====================
+django-axes
