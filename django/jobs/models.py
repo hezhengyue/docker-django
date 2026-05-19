@@ -1,6 +1,7 @@
 # jobs/models.py
 
 from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class Job(models.Model):
@@ -50,6 +51,8 @@ class Job(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        verbose_name = _('任务')
+        verbose_name_plural = verbose_name
         ordering = ['-id']
 
     def __str__(self):
@@ -81,6 +84,8 @@ class JobLog(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        verbose_name = _('任务日志')
+        verbose_name_plural = verbose_name
         ordering = ['id']
 
     def __str__(self):

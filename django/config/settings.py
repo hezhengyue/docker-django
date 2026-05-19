@@ -60,7 +60,7 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'core',
-    'common',
+    'common.apps.CommonConfig',
     'jobs',
 ]
 
@@ -348,8 +348,8 @@ AUTHENTICATION_BACKENDS = [
 AXES_FAILURE_LIMIT = 5
 # 封禁时间
 AXES_COOLOFF_TIME = timedelta(hours=1)
-# IP + 用户名联合封禁
-AXES_LOCKOUT_PARAMETERS = ["ip_address", "username"]
+# 同一个ip只锁定一个账户
+AXES_LOCKOUT_PARAMETERS = [["ip_address", "username"]]
 # 登录成功自动重置
 AXES_RESET_ON_SUCCESS = True
 # Admin 后台
@@ -381,6 +381,63 @@ INSTALLED_APPS +=  [
 MIDDLEWARE += [
     'auditlog.middleware.AuditlogMiddleware',
 ]
+
+# ===================== SimpleUI后台美化配置 =====================
+INSTALLED_APPS = [
+    'simpleui',
+] + INSTALLED_APPS
+
+SIMPLEUI_HOME_INFO = False
+SIMPLEUI_ANALYSIS = False
+SIMPLEUI_STATIC_OFFLINE = True
+
+logo_file_path = MEDIA_ROOT / 'logo.png'
+if logo_file_path.exists():
+    SIMPLEUI_LOGO = '/media/logo.png'
+
+# 定义图标 (common.admin.rename.py对第三方插件重命名)
+SIMPLEUI_ICON = {
+    '用户管理': 'far fa-bars',
+    '人员档案': 'far fa-person',
+
+    '任务中心': 'far fa-bars',
+    
+    '安全监控': 'fas fa-shield-alt',     
+    '锁定记录': 'fas fa-lock',           
+    '登录流水': 'fas fa-list-alt',      
+    
+    '操作审计': 'fas fa-history',        
+    '操作日志': 'fas fa-file-signature',  
+}
+
+# SimpleUI自定义菜单配置
+SIMPLEUI_CONFIG = {
+    'system_keep': False,
+    'menu_display': [
+        '用户管理',       # core
+        '任务中心',       # jobs
+        '安全监控',       # Axes
+        '操作审计',       # Audit log
+        #'认证和授权',    # 分组
+        '定时任务',       # django_celery_beat
+    ], 
+    'dynamic': True,
+    # 自定义菜单
+    # 'menus': [
+    #     {
+    #         'name': '人脸识别',
+    #         'icon': 'far fa-camera',
+    #         'models': [
+    #             {
+    #                 'name': '开始识别',
+    #                 'url': '/face-scan/',
+    #                 'icon': 'fas fa-search'
+    #             }
+    #         ]
+    #     },
+    # ]
+}
+
 
 
 # 🛡️ 生产环境安全拦截（放在文件末尾，DEBUG 判断之后）
